@@ -1,0 +1,82 @@
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+
+spring:
+  application:
+    name: resilient-stock-service
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: stock-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+# resilience4j:
+#   retry:
+#     instances:
+#       stock-api: # Java kodundaki @Retry(name = "...") ile aynı olmalı
+#         max-attempts: 3             # Toplam 3 kere dene (İlk istek + 2 tekrar)
+#         wait-duration: 2s           # İlk hatada 2 saniye bekle
+#         enable-exponential-backoff: true
+#         exponential-backoff-multiplier: 2 # Bekleme süresini her seferinde 2 ile çarp (2s -> 4s -> 8s)
+#   circuitbreaker:
+#     instances:
+#       stockService: # Bu isim önemli, kodda bunu kullanacağız
+#         registerHealthIndicator: true
+#         slidingWindowSize: 5        # Son 5 isteğe bakacağız (Testi kolay olsun diye az verdik)
+#         failureRateThreshold: 50    # %50 hata oranına ulaşırsa sigortayı attır
+#         waitDurationInOpenState: 10s # Sigorta attıktan sonra 10 saniye bekle (Open -> Half-Open)
+#         permittedNumberOfCallsInHalfOpenState: 3 # Test modunda 3 isteğe izin ver
+#         automaticTransitionFromOpenToHalfOpenEnabled: true
+
+  
+resilience4j:
+  # --- RETRY AYARLARI
+  retry:
+    instances:
+      stock-api:
+        maxAttempts: 3
+        waitDuration: 1s
+
+  # --- CIRCUIT BREAKER AYARLARI---
+  circuitbreaker:
+    instances:
+      stock-api:
+        registerHealthIndicator: true
+        slidingWindowSize: 6         # Son 6 denemeye bak (Testi kolay olsun)
+        failureRateThreshold: 50     # %50'si hata olursa sigortayı at
+        waitDurationInOpenState: 10s # Sigorta atınca 10 saniye bekle
+        permittedNumberOfCallsInHalfOpenState: 3 # Yarı açıkken 3 kere dene
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics # Health ve Metric endpointlerini açıyoruz
+  endpoint:
+    health:
+      show-details: always # Detaylı bilgi (Circuit Breaker durumu) görmek için
+  health:
+    circuitbreakers:
+      enabled: true # Circuit Breaker durumunu health check'e dahil et
+    ratelimiters:
+      enabled: true # Rate Limiter durumunu da görebiliriz
+  tracing:
+    sampling:
+      probability: 1.0 # 1.0 = Tüm istekleri kaydet (%100). Prod ortamında genelde 0.1 yapılır.
+  zipkin:
+    tracing:
+      endpoint: "http://localhost:9411/api/v2/spans" # Zipkin sunucusu adresi
+
+
