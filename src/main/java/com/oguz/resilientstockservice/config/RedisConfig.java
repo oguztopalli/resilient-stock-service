@@ -17,22 +17,15 @@ public class RedisConfig {
 
     @Bean
     public ProxyManager<String> proxyManager(RedissonClient redissonClient) {
-        // 1. JCache Provider'ı alıyoruz
         CachingProvider cachingProvider = Caching.getCachingProvider();
         CacheManager cacheManager = cachingProvider.getCacheManager();
 
-        // 2. DÜZELTME BURADA:
-        // Değişken tipini 'RedissonConfiguration' yerine genel 'javax.cache.configuration.Configuration' yaptık.
-        // Ayrıca Generics tipini <String, byte[]> olarak belirttik.
         javax.cache.configuration.Configuration<String, byte[]> config = RedissonConfiguration.fromInstance(redissonClient);
-
-        // Cache'i alıyoruz veya oluşturuyoruz
+        
         Cache<String, byte[]> cache = cacheManager.getCache("rate-limit-cache");
         if (cache == null) {
             cache = cacheManager.createCache("rate-limit-cache", config);
         }
-
-        // 3. Bucket4j Yöneticisini döndürüyoruz
         return new JCacheProxyManager<>(cache);
     }
 }
